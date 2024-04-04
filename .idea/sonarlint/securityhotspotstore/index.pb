@@ -1,0 +1,29 @@
+
+9
+	README.md,8/e/8ec9a00bfd09b3190ac6b22251dbb1aa95a0579d
+X
+(order-service/src/app.controller.spec.ts,0/b/0b1c580e71bf4d1c913dbab1bad0c6e3c79ff1ac
+J
+order-service/package.json,1/6/162c56baabcc15dff1aa93dc8a399c9b6e48e9a1
+Y
+)order-service/src/orders/orders.module.ts,e/7/e71f11d4c671578a02f47c4dbcf6c1bcb4cfb37b
+Z
+*order-service/src/orders/orders.service.ts,a/8/a8814bfa78b91a0e0179434e27e205d652a71a83
+P
+ order-service/src/app.service.ts,6/b/6b8eac44623375fb622328e53f73552197f0d40f
+O
+order-service/src/app.module.ts,1/9/19775f5f9a4dc0ebe8c6934bcb9a1d9bda75f019
+S
+#order-service/src/app.controller.ts,b/2/b28d7e700fe34cae788ce9a98acbb55f13213e16
+b
+2order-service/src/orders/orders.controller.spec.ts,c/c/cc4d5833570ebc8492196c5000a46ee022669a96
+]
+-order-service/src/orders/orders.controller.ts,a/a/aa73a20da38005af45735e83731cc2c6b62aa83a
+T
+$order-service/src/orders/order.proto,5/4/54e0346a75c53ecd707bab1f6737954b17e499ec
+Z
+*product-service/src/products/product.proto,a/a/aabc509fce1704546df7f9851b2b51d43acf1634
+I
+order-service/src/main.ts,d/1/d1f24870651294f45b1e7b373de9c07f840b399c
+K
+product-service/src/main.ts,2/2/2253c99e42b102dfc9e9e2b968a9b01376f53ad4

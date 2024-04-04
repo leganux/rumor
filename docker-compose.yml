@@ -1,0 +1,53 @@
+version: '3'
+
+services:
+  order_service:
+    build: ./order-service
+    ports:
+      - "50052:50052"
+      - "3008:3008"
+    networks:
+      - rumor
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3008" ]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      start_interval: 5s
+    restart: always
+
+  product_service:
+    build: ./product-service
+    ports:
+      - "50057:50057"
+      - "3007:3007"
+    networks:
+      - rumor
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3007" ]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+      start_interval: 5s
+    restart: always
+
+  api_gateway:
+    build: ./api-gateway
+    ports:
+      - "8080:8080"
+    networks:
+      - rumor
+    depends_on:
+      order_service:
+        condition: service_started
+      product_service:
+        condition: service_started
+    restart: always
+
+
+
+networks:
+  rumor:
+    driver: bridge

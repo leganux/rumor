@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"log"
 	"net/http"
 	"time"
@@ -12,6 +13,9 @@ import (
 
 	orderpb "api-gateway/generated/order"
 	productpb "api-gateway/generated/product"
+
+	gcontext "github.com/gorilla/context"
+	"github.com/gorilla/mux"
 )
 
 // Client connections to gRPC services
@@ -19,9 +23,16 @@ var orderClient orderpb.OrderServiceClient
 var productClient productpb.ProductServiceClient
 
 const (
-	orderServiceAddress   = "localhost:50052" // Dirección del servicio de órdenes
-	productServiceAddress = "localhost:50057" // Dirección del servicio de productos
+	//orderServiceAddress   = "127.0.0.1:50052" // Dirección del servicio de órdenes
+	//productServiceAddress = "127.0.0.1:50057" // Dirección del servicio de productos
+	orderServiceAddress   = "order_service:50052"   // Dirección del servicio de órdenes
+	productServiceAddress = "product_service:50057" // Dirección del servicio de productos
 )
+
+type User struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
 
 func checkServiceStatus(address string) string {
 	// Create a new gRPC client connection with insecure credentials
@@ -284,21 +295,100 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func validateTokenMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Verifica si la ruta es "/" o "/login"
+		if r.URL.Path == "/" || r.URL.Path == "/login" {
+			// Si es así, permite el acceso sin autenticación
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		tokenString := r.Header.Get("Authorization")
+		if tokenString == "" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Verifica el método de firma
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return []byte("your-secret-key"), nil
+		})
+		if err != nil || !token.Valid {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Si el token es válido, almacenar el usuario en el contexto
+		gcontext.Set(r, "user", token.Claims.(jwt.MapClaims)["username"])
+
+		// Continuar con la siguiente manejador
+		next.ServeHTTP(w, r)
+	})
+}
+
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	var user User
+	err := json.NewDecoder(r.Body).Decode(&user)
+	if err != nil {
+		http.Error(w, "Error decoding JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Imprime la estructura User como JSON
+	userJSON, err := json.Marshal(user)
+	if err != nil {
+		http.Error(w, "Error encoding User to JSON", http.StatusInternalServerError)
+		return
+	}
+	fmt.Println(string(userJSON))
+
+	// Verifica las credenciales del usuario
+	if user.Username == "admin" && user.Password == "Kt3RickS0n" {
+		// Crea el token JWT
+		token := jwt.New(jwt.SigningMethodHS256)
+		claims := token.Claims.(jwt.MapClaims)
+		claims["username"] = user.Username
+		claims["exp"] = time.Now().Add(time.Hour * 24).Unix() // Token expira en 24 horas
+
+		// Firma el token JWT
+		tokenString, err := token.SignedString([]byte("your-secret-key"))
+		if err != nil {
+			http.Error(w, "Error signing token", http.StatusInternalServerError)
+			return
+		}
+
+		// Devuelve el token JWT al cliente
+		json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
+	} else {
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
+		return
+	}
+}
+
 func main() {
 	// Create HTTP server
-	http.HandleFunc("/api/orders", createOrderHandler)
-	http.HandleFunc("/api/orders/update", updateOrderHandler)
-	http.HandleFunc("/api/orders/delete", deleteOrderHandler)
-	http.HandleFunc("/api/products", getAllProductsHandler)
-	http.HandleFunc("/api/products/create", createProductHandler)
-	http.HandleFunc("/api/products/get", getProductByIdHandler)
-	http.HandleFunc("/api/products/update", updateProductHandler)
-	http.HandleFunc("/api/products/delete", deleteProductHandler)
+	router := mux.NewRouter()
+	router.HandleFunc("/login", loginHandler).Methods("POST")
+	router.HandleFunc("/api/orders", createOrderHandler).Methods("POST")
+	router.HandleFunc("/api/orders/update", updateOrderHandler).Methods("PUT")
+	router.HandleFunc("/api/orders/delete", deleteOrderHandler).Methods("DELETE")
 
-	http.HandleFunc("/", indexHandler)
+	router.HandleFunc("/api/products", getAllProductsHandler).Methods("GET")
+	router.HandleFunc("/api/products/create", createProductHandler).Methods("POST")
+	router.HandleFunc("/api/products/get", getProductByIdHandler).Methods("GET")
+	router.HandleFunc("/api/products/update", updateProductHandler).Methods("PUT")
+	router.HandleFunc("/api/products/delete", deleteProductHandler).Methods("DELETE")
+	router.HandleFunc("/", indexHandler).Methods("GET")
+
+	// Use el middleware para validar el token JWT
+	router.Use(validateTokenMiddleware)
 
 	fmt.Println("Server listening on port 8080")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServe(":8080", router); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }
