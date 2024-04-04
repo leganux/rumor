@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package order;
 
-option go_package = "github.com/leganux/rumor/api-gateway/generated";
+option go_package = "./order";
 
 message OrderProduct {
   string productId = 1;

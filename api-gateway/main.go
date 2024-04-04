@@ -3,141 +3,302 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/gorilla/mux"
 	"google.golang.org/grpc"
 
-	pb "api-gateway/generated" // Import your compiled Protobuf package
+	orderpb "api-gateway/generated/order"
+	productpb "api-gateway/generated/product"
 )
+
+// Client connections to gRPC services
+var orderClient orderpb.OrderServiceClient
+var productClient productpb.ProductServiceClient
 
 const (
-	productServiceAddress = "localhost:3007" // Address of Product Service gRPC server
-	orderServiceAddress   = "localhost:3008" // Address of Order Service gRPC server
+	orderServiceAddress   = "localhost:50052" // Dirección del servicio de órdenes
+	productServiceAddress = "localhost:50057" // Dirección del servicio de productos
 )
 
-// Define a struct to represent the product data
-type Product struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Description string  `json:"description"`
-	Price       float64 `json:"price"`
-	Quantity    int     `json:"quantity"`
-}
-
-// Define a struct to represent the order data
-type Order struct {
-	ID         string         `json:"id"`
-	CustomerID string         `json:"customerId"`
-	Products   []OrderProduct `json:"products"`
-}
-
-// Define a struct to represent the products within an order
-type OrderProduct struct {
-	ProductID string `json:"productId"`
-	Quantity  int    `json:"quantity"`
-}
-
-// Sample product data
-var products = []Product{}
-
-// Create gRPC client connections
-var productClient pb.ProductServiceClient
-var orderClient pb.OrderServiceClient
-
-func main() {
-	// Create gRPC connections to Product Service and Order Service
-	productConn, err := grpc.Dial(productServiceAddress, grpc.WithInsecure())
+func checkServiceStatus(address string) string {
+	// Create a new gRPC client connection with insecure credentials
+	conn, err := grpc.NewClient(address, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("Failed to connect to Product Service: %v", err)
+		return "error"
 	}
-	defer productConn.Close()
-	productClient = pb.NewProductServiceClient(productConn)
+	//defer conn.Close()
 
-	orderConn, err := grpc.Dial(orderServiceAddress, grpc.WithInsecure())
+	// Create a client from the connection
+	client := orderpb.NewOrderServiceClient(conn)
+
+	// Attempt to perform a simple RPC request to the service
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	_, err = client.FindAllOrders(ctx, &orderpb.FindAllOrdersRequest{})
+	fmt.Printf("%s", err)
 	if err != nil {
-		log.Fatalf("Failed to connect to Order Service: %v", err)
+		return "error"
+	}
+
+	return "ok"
+}
+
+// Initialize gRPC clients
+func init() {
+	// Create gRPC client connections with insecure credentials
+	orderConn, err := grpc.NewClient(orderServiceAddress, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to create client connection for order server: %v", err)
 	}
 	defer orderConn.Close()
-	orderClient = pb.NewOrderServiceClient(orderConn)
 
-	// Create a new Gorilla Mux router
-	router := mux.NewRouter()
-
-	// Define endpoints
-	router.HandleFunc("/products", getProducts).Methods("GET")
-	router.HandleFunc("/orders", createOrder).Methods("POST")
-
-	// Create a HTTP server
-	srv := &http.Server{
-		Handler:      router,
-		Addr:         "127.0.0.1:8080",
-		WriteTimeout: 15 * time.Second,
-		ReadTimeout:  15 * time.Second,
+	productConn, err := grpc.NewClient(productServiceAddress, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("Failed to create client connection for product server: %v", err)
 	}
+	//defer productConn.Close()
 
-	// Start the server
-	log.Fatal(srv.ListenAndServe())
+	// Create clients from the connections
+	orderClient = orderpb.NewOrderServiceClient(orderConn)
+	productClient = productpb.NewProductServiceClient(productConn)
 }
 
-// Handler function to get all products
-func getProducts(w http.ResponseWriter, r *http.Request) {
-	// Call gRPC method to retrieve products from Product Service
-	response, err := productClient.GetProducts(context.Background(), &pb.GetProductsRequest{})
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+// Handlers for REST endpoints
+func createProductHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Convert gRPC response to JSON
-	products := []*Product{}
-	for _, pbProduct := range response.Products {
-		product := &Product{
-			ID:          pbProduct.Id,
-			Name:        pbProduct.Name,
-			Description: pbProduct.Description,
-			Price:       pbProduct.Price,
-			Quantity:    int(pbProduct.Quantity),
-		}
-		products = append(products, product)
+	var request productpb.CreateProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
 	}
 
-	// Return products as JSON
+	response, err := productClient.CreateProduct(context.Background(), &request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error creating product: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing product ID", http.StatusBadRequest)
+		return
+	}
+
+	request := &productpb.FindProductByIdRequest{
+		Id: id,
+	}
+
+	response, err := productClient.FindProductById(context.Background(), request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error retrieving product: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func updateProductHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request productpb.UpdateProductRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	response, err := productClient.UpdateProduct(context.Background(), &request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error updating product: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing product ID", http.StatusBadRequest)
+		return
+	}
+
+	request := &productpb.DeleteProductRequest{
+		Id: id,
+	}
+
+	response, err := productClient.DeleteProduct(context.Background(), request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error deleting product: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func createOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request orderpb.CreateOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	response, err := orderClient.CreateOrder(context.Background(), &request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error creating order: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	var request orderpb.UpdateOrderRequest
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	response, err := orderClient.UpdateOrder(context.Background(), &request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error updating order: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := r.URL.Query().Get("id")
+	if id == "" {
+		http.Error(w, "Missing order ID", http.StatusBadRequest)
+		return
+	}
+
+	request := &orderpb.DeleteOrderRequest{
+		Id: id,
+	}
+
+	response, err := orderClient.DeleteOrder(context.Background(), request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error deleting order: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	request := &productpb.FindAllProductsRequest{}
+
+	response, err := productClient.FindAllProducts(context.Background(), request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error retrieving products: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+
+func indexHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	// Verifica el estado del servicio de órdenes
+	orderStatus := checkServiceStatus(orderServiceAddress)
+
+	// Verifica el estado del servicio de productos
+	productStatus := checkServiceStatus(productServiceAddress)
+
+	// Construye el JSON de respuesta
+	jsonResponse := map[string]interface{}{
+		"message": "started correctly",
+		"success": true,
+		"connection": map[string]string{
+			"orders":   orderStatus,
+			"products": productStatus,
+		},
+	}
+
+	// Convierte el JSON a bytes
+	responseData, err := json.Marshal(jsonResponse)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+
+	// Establece el tipo de contenido de la respuesta como application/json
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(products)
+
+	// Escribe la respuesta JSON
+	_, err = w.Write(responseData)
+	if err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
 }
 
-// Handler function to create a new order
-func createOrder(w http.ResponseWriter, r *http.Request) {
-	// Decode the request body into an Order struct
-	var order Order
-	err := json.NewDecoder(r.Body).Decode(&order)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
+func main() {
+	// Create HTTP server
+	http.HandleFunc("/api/orders", createOrderHandler)
+	http.HandleFunc("/api/orders/update", updateOrderHandler)
+	http.HandleFunc("/api/orders/delete", deleteOrderHandler)
+	http.HandleFunc("/api/products", getAllProductsHandler)
+	http.HandleFunc("/api/products/create", createProductHandler)
+	http.HandleFunc("/api/products/get", getProductByIdHandler)
+	http.HandleFunc("/api/products/update", updateProductHandler)
+	http.HandleFunc("/api/products/delete", deleteProductHandler)
 
-	// Convert Order struct to gRPC request
-	orderRequest := &pb.CreateOrderRequest{
-		CustomerId: order.CustomerID,
-		Products:   []*pb.OrderProduct{},
-	}
-	for _, p := range order.Products {
-		orderRequest.Products = append(orderRequest.Products, &pb.OrderProduct{
-			ProductId: p.ProductID,
-			Quantity:  int32(p.Quantity),
-		})
-	}
+	http.HandleFunc("/", indexHandler)
 
-	// Call gRPC method to create order in Order Service
-	_, err = orderClient.CreateOrder(context.Background(), orderRequest)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	fmt.Println("Server listening on port 8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatalf("Failed to start server: %v", err)
 	}
-
-	// Return success response
-	w.WriteHeader(http.StatusCreated)
 }
