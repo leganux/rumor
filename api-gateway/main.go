@@ -96,7 +96,7 @@ func createProductHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error creating product: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -121,7 +121,7 @@ func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error retrieving product: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -142,7 +142,7 @@ func updateProductHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error updating product: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -167,7 +167,7 @@ func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error deleting product: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -188,7 +188,7 @@ func createOrderHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error creating order: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -209,7 +209,7 @@ func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error updating order: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -234,7 +234,7 @@ func deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error deleting order: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -251,7 +251,7 @@ func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("Error retrieving products: %v", err), http.StatusInternalServerError)
 		return
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
 
@@ -324,7 +324,7 @@ func validateTokenMiddleware(next http.Handler) http.Handler {
 
 		// Si el token es válido, almacenar el usuario en el contexto
 		gcontext.Set(r, "user", token.Claims.(jwt.MapClaims)["username"])
-
+		w.Header().Set("Content-Type", "application/json")
 		// Continuar con la siguiente manejador
 		next.ServeHTTP(w, r)
 	})
@@ -360,7 +360,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Error signing token", http.StatusInternalServerError)
 			return
 		}
-
+		w.Header().Set("Content-Type", "application/json")
 		// Devuelve el token JWT al cliente
 		json.NewEncoder(w).Encode(map[string]string{"token": tokenString})
 	} else {
