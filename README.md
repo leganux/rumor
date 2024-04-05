@@ -18,7 +18,13 @@ Execution:
  git clone https://github.com/leganux/rumor
  ```
 
-2. Start Docker Compose:
+2. Rename env_example -> .env and configure
+
+```bash
+mv env_example .env
+```
+
+3. Start Docker Compose:
    Run the following command to start Docker Compose, which will set up the API Gateway along with the required
    microservices:
 
@@ -26,7 +32,7 @@ Execution:
 docker-compose up
 ```
 
-3. Access the API:
+4. Access the API:
    Once Docker Compose has successfully started, you can access the API using the base URL http://localhost:8080.
 
 ### Files and Folders

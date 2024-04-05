@@ -27,3 +27,11 @@ I
 order-service/src/main.ts,d/1/d1f24870651294f45b1e7b373de9c07f840b399c
 K
 product-service/src/main.ts,2/2/2253c99e42b102dfc9e9e2b968a9b01376f53ad4
+B
+order-service/.env,3/3/33ef9db8c800a03d856fb41ec05d07a6688f4f6d
+D
+product-service/.env,3/3/334842128953bd57b0ef017341147eaa25126882
+H
+order-service/Dockerfile,6/c/6ca8c7ba98a55aa5204b50509916e7ece908a304
+J
+product-service/Dockerfile,5/a/5acdeee26f319910f4b78e31e20e10b81c2b9f1c
