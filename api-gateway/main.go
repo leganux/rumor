@@ -199,6 +199,14 @@ func createOrderHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	requestJSON, err := json.Marshal(request)
+	if err != nil {
+		// Handle error if unable to marshal request to JSON
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error marshaling request JSON")
+		return
+	}
+	fmt.Println("Request body JSON:", string(requestJSON))
+
 	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
@@ -375,9 +383,9 @@ func main() {
 	user := os.Getenv("AUTH_USER")
 	password := os.Getenv("AUTH_PASSWORD")
 
-	if env == "Develop" {
-		orderServiceAddress = "127.0.0.1:50052"
-		productServiceAddress = "127.0.0.1:50057"
+	if env == "develop" {
+		orderServiceAddress = "localhost:50052"
+		productServiceAddress = "localhost:50057"
 	}
 	if secret_key != "" {
 		rumorSecretKey = secret_key
@@ -388,6 +396,7 @@ func main() {
 	if password != "" {
 		rumorPassword = password
 	}
+	fmt.Printf("orderservice =  %s  productService = %s ", orderServiceAddress, productServiceAddress)
 
 	router := mux.NewRouter()
 	router.HandleFunc("/login", loginHandler).Methods("POST")

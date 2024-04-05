@@ -1,6 +1,11 @@
 # Use the official Node.js image
 FROM node:20-alpine
 
+ENV ENVIRONMENT=stage
+ENV PORT_API=3008
+ENV PORT_GRCP=50052
+
+
 RUN apk add curl
 # Set the working directory
 WORKDIR /app

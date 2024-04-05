@@ -319,8 +319,7 @@ fetch("http://localhost:8080/api/products/delete?id=1", requestOptions)
   .then((result) => console.log(result))
   .catch((error) => console.error(error));
 ```
-### Test
-To execute testing you must to replace networks on local mode, run manually and run command
+
 
 ### Response Standardized example
 * status: The code status
@@ -362,6 +361,8 @@ To execute testing you must to replace networks on local mode, run manually and 
     "message": "Error retrieving product"
 }
 ```
+### Test
+To execute testing you must to replace networks on local mode, run manually and run command
 
 ```bash
 go test

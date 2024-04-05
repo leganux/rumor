@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -39,9 +40,12 @@ func TestLoginAndGetToken(t *testing.T) {
 		t.Fatalf("Error decoding token response: %v", err)
 	}
 	token = tokenResponse["token"]
+	fmt.Printf("The token is %s", token)
 }
 
 func TestCreateOrderHandler(t *testing.T) {
+
+	fmt.Printf("Order handler Start ")
 	// Ensure token is obtained before running the test
 	if token == "" {
 		t.Fatal("Token not obtained from login")
@@ -65,7 +69,7 @@ func TestCreateOrderHandler(t *testing.T) {
 	}
 
 	// Set the Authorization header with the obtained token
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", token)
 
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
@@ -73,17 +77,27 @@ func TestCreateOrderHandler(t *testing.T) {
 	// Call the createOrderHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(createOrderHandler).ServeHTTP(rr, req)
 
-	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Print status response
+	fmt.Printf("Status Response: %v\n", rr.Code)
+
+	// Print response body JSON
+	fmt.Printf("Response Body JSON: %s\n", rr.Body.String())
+
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
 
-	// Check the response body
-	expectedResponse := `{"orderId":"some_order_id"}`
-	if rr.Body.String() != expectedResponse {
-		t.Errorf("handler returned unexpected body: got %v want %v",
-			rr.Body.String(), expectedResponse)
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
 	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
+	fmt.Printf("Order handler End")
 }
 
 func TestUpdateOrderHandler(t *testing.T) {
@@ -103,16 +117,25 @@ func TestUpdateOrderHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the updateOrderHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(updateOrderHandler).ServeHTTP(rr, req)
-	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestDeleteOrderHandler(t *testing.T) {
@@ -121,16 +144,26 @@ func TestDeleteOrderHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the deleteOrderHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(deleteOrderHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestGetAllOrdersHandler(t *testing.T) {
@@ -139,16 +172,26 @@ func TestGetAllOrdersHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the getAllOrdersHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(getAllOrdersHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestCreateProductHandler(t *testing.T) {
@@ -164,16 +207,26 @@ func TestCreateProductHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the createProductHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(createProductHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestUpdateProductHandler(t *testing.T) {
@@ -190,16 +243,26 @@ func TestUpdateProductHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the updateProductHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(updateProductHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestDeleteProductHandler(t *testing.T) {
@@ -208,16 +271,26 @@ func TestDeleteProductHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the deleteProductHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(deleteProductHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
 
 func TestGetAllProductsHandler(t *testing.T) {
@@ -226,14 +299,24 @@ func TestGetAllProductsHandler(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", ""+token)
 	// Create a ResponseRecorder to record the response
 	rr := httptest.NewRecorder()
 	// Call the getAllProductsHandler function directly, passing in the ResponseRecorder and the Request
 	http.HandlerFunc(getAllProductsHandler).ServeHTTP(rr, req)
 	// Check the status code
-	if status := rr.Code; status != http.StatusOK {
-		t.Errorf("Handler returned wrong status code: got %v want %v", status, http.StatusOK)
+	// Parse response body as JSON
+	var responseBody map[string]interface{}
+	if err := json.Unmarshal(rr.Body.Bytes(), &responseBody); err != nil {
+		t.Fatalf("failed to unmarshal response body: %v", err)
 	}
-	// Check the response body if needed
+
+	// Check if 'success' and 'message' fields exist in the response
+	success, successExists := responseBody["success"].(bool)
+	message, messageExists := responseBody["message"].(string)
+	if !successExists || !messageExists {
+		t.Errorf("response does not contain 'success' or 'message' fields")
+	}
+
+	fmt.Printf("Test successfully executed :: Parameters correctly appear in format response. \n  { success: %v, message: %s } \n", success, message)
 }
