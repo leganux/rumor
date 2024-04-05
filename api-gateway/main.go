@@ -34,30 +34,6 @@ type User struct {
 	Password string `json:"password"`
 }
 
-func checkServiceStatus(address string) string {
-	// Create a new gRPC client connection with insecure credentials
-	conn, err := grpc.NewClient(address, grpc.WithInsecure())
-	if err != nil {
-		return "error"
-	}
-	//defer conn.Close()
-
-	// Create a client from the connection
-	client := orderpb.NewOrderServiceClient(conn)
-
-	// Attempt to perform a simple RPC request to the service
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
-
-	_, err = client.FindAllOrders(ctx, &orderpb.FindAllOrdersRequest{})
-	fmt.Printf("%s", err)
-	if err != nil {
-		return "error"
-	}
-
-	return "ok"
-}
-
 // Initialize gRPC clients
 func init() {
 	// Create gRPC client connections with insecure credentials
@@ -65,7 +41,7 @@ func init() {
 	if err != nil {
 		log.Fatalf("Failed to create client connection for order server: %v", err)
 	}
-	defer orderConn.Close()
+	//defer orderConn.Close()
 
 	productConn, err := grpc.NewClient(productServiceAddress, grpc.WithInsecure())
 	if err != nil {
@@ -99,7 +75,6 @@ func createProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
-
 func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -124,7 +99,6 @@ func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
-
 func updateProductHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -145,7 +119,6 @@ func updateProductHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(response)
 }
-
 func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -161,10 +134,26 @@ func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	request := &productpb.DeleteProductRequest{
 		Id: id,
 	}
-
+	w.Header().Set("Content-Type", "application/json")
 	response, err := productClient.DeleteProduct(context.Background(), request)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error deleting product: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	json.NewEncoder(w).Encode(response)
+}
+func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	request := &productpb.FindAllProductsRequest{}
+
+	response, err := productClient.FindAllProducts(context.Background(), request)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error retrieving products: %v", err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -238,21 +227,32 @@ func deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
+func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	request := &productpb.FindAllProductsRequest{}
+	// Create an empty request
+	request := &orderpb.FindAllOrdersRequest{}
 
-	response, err := productClient.FindAllProducts(context.Background(), request)
+	// Call gRPC service to get all orders
+	response, err := orderClient.FindAllOrders(context.Background(), request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error retrieving products: %v", err), http.StatusInternalServerError)
+		// If there's an error, return internal server error
+		http.Error(w, fmt.Sprintf("Error retrieving Orders: %v", err), http.StatusInternalServerError)
 		return
 	}
+
+	// If no errors, set Content-Type header to application/json
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	// Encode the response into JSON format and write it to the HTTP response
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		// If there's an error encoding the response, return internal server error
+		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
+		return
+	}
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -261,20 +261,10 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verifica el estado del servicio de órdenes
-	orderStatus := checkServiceStatus(orderServiceAddress)
-
-	// Verifica el estado del servicio de productos
-	productStatus := checkServiceStatus(productServiceAddress)
-
 	// Construye el JSON de respuesta
 	jsonResponse := map[string]interface{}{
 		"message": "started correctly",
 		"success": true,
-		"connection": map[string]string{
-			"orders":   orderStatus,
-			"products": productStatus,
-		},
 	}
 
 	// Convierte el JSON a bytes
@@ -315,7 +305,7 @@ func validateTokenMiddleware(next http.Handler) http.Handler {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte("your-secret-key"), nil
+			return []byte("rumor_secret_key"), nil
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -355,7 +345,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		claims["exp"] = time.Now().Add(time.Hour * 24).Unix() // Token expira en 24 horas
 
 		// Firma el token JWT
-		tokenString, err := token.SignedString([]byte("your-secret-key"))
+		tokenString, err := token.SignedString([]byte("rumor_secret_key"))
 		if err != nil {
 			http.Error(w, "Error signing token", http.StatusInternalServerError)
 			return
@@ -373,7 +363,9 @@ func main() {
 	// Create HTTP server
 	router := mux.NewRouter()
 	router.HandleFunc("/login", loginHandler).Methods("POST")
-	router.HandleFunc("/api/orders", createOrderHandler).Methods("POST")
+
+	router.HandleFunc("/api/orders", getAllOrdersHandler).Methods("GET")
+	router.HandleFunc("/api/orders/create", createOrderHandler).Methods("POST")
 	router.HandleFunc("/api/orders/update", updateOrderHandler).Methods("PUT")
 	router.HandleFunc("/api/orders/delete", deleteOrderHandler).Methods("DELETE")
 
