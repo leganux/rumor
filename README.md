@@ -26,7 +26,7 @@ docker-compose up
 ```
 
 3. Access the API:
-Once Docker Compose has successfully started, you can access the API using the base URL http://localhost:808330.
+Once Docker Compose has successfully started, you can access the API using the base URL http://localhost:8080.
 
 ### Files and Folders
 
