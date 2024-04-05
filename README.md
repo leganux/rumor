@@ -18,7 +18,7 @@ Execution:
  git clone https://github.com/leganux/rumor
  ```
 
-2. Rename env_example -> .env and configure
+2. Rename env_example on the api gateway, order and product services folders to .env (and modify them if needed)
 
 ```bash
 mv env_example .env
