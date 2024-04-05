@@ -4,30 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
 	"log"
 	"net/http"
+	"os"
 	"time"
-
-	"google.golang.org/grpc"
 
 	orderpb "api-gateway/generated/order"
 	productpb "api-gateway/generated/product"
-
+	jwt "github.com/dgrijalva/jwt-go"
 	gcontext "github.com/gorilla/context"
 	"github.com/gorilla/mux"
+	"github.com/joho/godotenv"
+	"google.golang.org/grpc"
 )
 
 // Client connections to gRPC services
 var orderClient orderpb.OrderServiceClient
 var productClient productpb.ProductServiceClient
-
-const (
-	//orderServiceAddress   = "127.0.0.1:50052" // Dirección del servicio de órdenes
-	//productServiceAddress = "127.0.0.1:50057" // Dirección del servicio de productos
-	orderServiceAddress   = "order_service:50052"   // Dirección del servicio de órdenes
-	productServiceAddress = "product_service:50057" // Dirección del servicio de productos
-)
+var orderServiceAddress = "order_service:50052"
+var productServiceAddress = "product_service:50057"
+var rumorSecretKey = "rumor_secret_key"
+var rumorUser = "admin"
+var rumorPassword = "Kt3RickS0n"
 
 type User struct {
 	Username string `json:"username"`
@@ -54,36 +52,59 @@ func init() {
 	productClient = productpb.NewProductServiceClient(productConn)
 }
 
+func sendResponse(w http.ResponseWriter, status int, data interface{}, err error, message string) {
+	response := struct {
+		Status  int         `json:"status"`
+		Data    interface{} `json:"data"`
+		Error   string      `json:"error"`
+		Success bool        `json:"success"`
+		Message string      `json:"message"`
+	}{
+		Status:  status,
+		Data:    data,
+		Success: err == nil,
+		Message: message,
+	}
+
+	if err != nil {
+		response.Error = "Internal Server Error: " + err.Error()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(response)
+}
+
 // Handlers for REST endpoints
 func createProductHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	var request productpb.CreateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, err, "Invalid request body")
 		return
 	}
 
 	response, err := productClient.CreateProduct(context.Background(), &request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error creating product: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error creating product")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Missing product ID", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, nil, "Missing product ID")
 		return
 	}
 
@@ -93,59 +114,59 @@ func getProductByIdHandler(w http.ResponseWriter, r *http.Request) {
 
 	response, err := productClient.FindProductById(context.Background(), request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error retrieving product: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error retrieving product")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 func updateProductHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	var request productpb.UpdateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, err, "Invalid request body")
 		return
 	}
 
 	response, err := productClient.UpdateProduct(context.Background(), &request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error updating product: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error updating product")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 func deleteProductHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Missing product ID", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, nil, "Missing product ID")
 		return
 	}
 
 	request := &productpb.DeleteProductRequest{
 		Id: id,
 	}
-	w.Header().Set("Content-Type", "application/json")
+
 	response, err := productClient.DeleteProduct(context.Background(), request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error deleting product: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error deleting product")
 		return
 	}
 
-	json.NewEncoder(w).Encode(response)
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
@@ -153,64 +174,62 @@ func getAllProductsHandler(w http.ResponseWriter, r *http.Request) {
 
 	response, err := productClient.FindAllProducts(context.Background(), request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error retrieving products: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error retrieving products")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 
 func createOrderHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	var request orderpb.CreateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, err, "Invalid request body")
 		return
 	}
 
 	response, err := orderClient.CreateOrder(context.Background(), &request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error creating order: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error creating order")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
 
+	sendResponse(w, http.StatusOK, response, nil, "OK")
+}
 func updateOrderHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	var request orderpb.UpdateOrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
-		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, err, "Invalid request body")
 		return
 	}
 
 	response, err := orderClient.UpdateOrder(context.Background(), &request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error updating order: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error updating order")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
 
+	sendResponse(w, http.StatusOK, response, nil, "OK")
+}
 func deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodDelete {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
 	id := r.URL.Query().Get("id")
 	if id == "" {
-		http.Error(w, "Missing order ID", http.StatusBadRequest)
+		sendResponse(w, http.StatusBadRequest, nil, nil, "Missing order ID")
 		return
 	}
 
@@ -220,39 +239,27 @@ func deleteOrderHandler(w http.ResponseWriter, r *http.Request) {
 
 	response, err := orderClient.DeleteOrder(context.Background(), request)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Error deleting order: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error deleting order")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-}
 
+	sendResponse(w, http.StatusOK, response, nil, "OK")
+}
 func getAllOrdersHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		sendResponse(w, http.StatusMethodNotAllowed, nil, nil, "Method not allowed")
 		return
 	}
 
-	// Create an empty request
 	request := &orderpb.FindAllOrdersRequest{}
 
-	// Call gRPC service to get all orders
 	response, err := orderClient.FindAllOrders(context.Background(), request)
 	if err != nil {
-		// If there's an error, return internal server error
-		http.Error(w, fmt.Sprintf("Error retrieving Orders: %v", err), http.StatusInternalServerError)
+		sendResponse(w, http.StatusInternalServerError, nil, err, "Error retrieving orders")
 		return
 	}
 
-	// If no errors, set Content-Type header to application/json
-	w.Header().Set("Content-Type", "application/json")
-
-	// Encode the response into JSON format and write it to the HTTP response
-	if err := json.NewEncoder(w).Encode(response); err != nil {
-		// If there's an error encoding the response, return internal server error
-		http.Error(w, fmt.Sprintf("Error encoding response: %v", err), http.StatusInternalServerError)
-		return
-	}
+	sendResponse(w, http.StatusOK, response, nil, "OK")
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -284,7 +291,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
 func validateTokenMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Verifica si la ruta es "/" o "/login"
@@ -305,7 +311,7 @@ func validateTokenMiddleware(next http.Handler) http.Handler {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
-			return []byte("rumor_secret_key"), nil
+			return []byte(rumorSecretKey), nil
 		})
 		if err != nil || !token.Valid {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -319,7 +325,6 @@ func validateTokenMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
 func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err := json.NewDecoder(r.Body).Decode(&user)
@@ -337,7 +342,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println(string(userJSON))
 
 	// Verifica las credenciales del usuario
-	if user.Username == "admin" && user.Password == "Kt3RickS0n" {
+	if user.Username == rumorUser && user.Password == rumorPassword {
 		// Crea el token JWT
 		token := jwt.New(jwt.SigningMethodHS256)
 		claims := token.Claims.(jwt.MapClaims)
@@ -345,7 +350,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		claims["exp"] = time.Now().Add(time.Hour * 24).Unix() // Token expira en 24 horas
 
 		// Firma el token JWT
-		tokenString, err := token.SignedString([]byte("rumor_secret_key"))
+		tokenString, err := token.SignedString([]byte(rumorSecretKey))
 		if err != nil {
 			http.Error(w, "Error signing token", http.StatusInternalServerError)
 			return
@@ -361,6 +366,29 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	// Create HTTP server
+
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+	env := os.Getenv("ENVIRONMENT")
+	secret_key := os.Getenv("SECRET_KEY")
+	user := os.Getenv("AUTH_USER")
+	password := os.Getenv("AUTH_PASSWORD")
+
+	if env == "Develop" {
+		orderServiceAddress = "127.0.0.1:50052"
+		productServiceAddress = "127.0.0.1:50057"
+	}
+	if secret_key != "" {
+		rumorSecretKey = secret_key
+	}
+	if user != "" {
+		rumorUser = user
+	}
+	if password != "" {
+		rumorPassword = password
+	}
+
 	router := mux.NewRouter()
 	router.HandleFunc("/login", loginHandler).Methods("POST")
 

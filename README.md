@@ -322,6 +322,47 @@ fetch("http://localhost:8080/api/products/delete?id=1", requestOptions)
 ### Test
 To execute testing you must to replace networks on local mode, run manually and run command
 
+### Response Standardized example
+* status: The code status
+* data: The information tha user request for
+* error: The internal error message
+* success: If request was correct or not
+* Message: A message to show to user
+
+*OK Response Example*
+```json
+{
+    "status": 200,
+    "data": {
+        "products": [
+            {
+                "id": "1",
+                "name": "Coke 100 Ml2",
+                "description": "Soda 100 ML cola flavor2",
+                "price": 34.2,
+                "quantity": 5
+            }
+        ]
+    },
+    "error": "",
+    "success": true,
+    "message": "OK"
+}
+
+```
+
+*Error Response Example*
+
+```json
+{
+    "status": 500,
+    "data": null,
+    "error": "Internal Server Error: rpc error: code = Unknown desc = Internal server error",
+    "success": false,
+    "message": "Error retrieving product"
+}
+```
+
 ```bash
 go test
 ```

@@ -1,6 +1,12 @@
 # Use the official Go image
 FROM golang:1.22-alpine
 
+ENV ENVIRONMENT=Staging
+ENV SECRET_KEY=87Pdmo76EFv_LGb7jTnunHniYD!90svCEC
+ENV AUTH_USER=admin
+ENV AUTH_PASSWORD=Kt3RickS0n
+
+
 # Set the working directory
 WORKDIR /app
 
